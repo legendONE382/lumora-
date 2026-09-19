@@ -1,0 +1,33 @@
+{
+  "name": "lumora",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
+    "@google/generative-ai": "^0.21.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "lucide-react": "^0.468.0",
+    "next": "^16.4.0-canary.17",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/uuid": "^9.0.0",
+    "autoprefixer": "^10.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.3.4",
+    "postcss": "^8.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
