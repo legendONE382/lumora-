@@ -1,10 +1,38 @@
 import { Project } from "@/types";
 import { saveVideoBlob, getVideoBlob, deleteVideoBlob } from "@/lib/db/indexeddb";
+import fs from "node:fs";
+import path from "node:path";
 
 const STORAGE_KEY = "lumora_projects";
 
-// In-memory server-side storage
-const serverStore = (globalThis as any).lumoraServerStore || ((globalThis as any).lumoraServerStore = new Map<string, Project>());
+// In-memory server-side storage with file persistence
+const serverStoreFile = path.join(process.cwd(), "tmp", "server-store.json");
+const serverStore = new Map<string, Project>();
+
+function loadServerStore(): void {
+  try {
+    if (fs.existsSync(serverStoreFile)) {
+      const data = fs.readFileSync(serverStoreFile, "utf-8");
+      const projects = JSON.parse(data) as Project[];
+      projects.forEach((p) => serverStore.set(p.id, p));
+    }
+  } catch {
+    // ignore load errors
+  }
+}
+
+function saveServerStore(): void {
+  try {
+    const dir = path.dirname(serverStoreFile);
+    fs.mkdirSync(dir, { recursive: true });
+    const data = JSON.stringify(Array.from(serverStore.values()));
+    fs.writeFileSync(serverStoreFile, data);
+  } catch {
+    // ignore save errors
+  }
+}
+
+loadServerStore();
 
 function isServer(): boolean {
   return typeof window === "undefined";
@@ -47,6 +75,7 @@ export function getProject(id: string): Project | undefined {
 export function saveProject(project: Project): void {
   if (isServer()) {
     serverStore.set(project.id, { ...project, updatedAt: new Date().toISOString() });
+    saveServerStore();
     return;
   }
   clientSaveProject(project);
@@ -55,6 +84,7 @@ export function saveProject(project: Project): void {
 export function deleteProject(id: string): void {
   if (isServer()) {
     serverStore.delete(id);
+    saveServerStore();
     return;
   }
   const projects = clientGetProjects().filter((p) => p.id !== id);
@@ -86,14 +116,19 @@ export async function updateProjectVideoUrl(id: string, videoUrl: string): Promi
 
 export async function getProjectVideoUrl(id: string): Promise<string | undefined> {
   const project = getProject(id);
-  if (!project || !project.videoUrl) return undefined;
+  if (!project) return undefined;
 
-  if (project.videoUrl.startsWith("/api/video/")) {
-    return project.videoUrl;
+  if (project.videoUrl) {
+    if (project.videoUrl.startsWith("/api/video/")) {
+      return project.videoUrl;
+    }
+    if (!project.videoUrl.startsWith("blob:")) {
+      return project.videoUrl;
+    }
   }
 
-  if (!project.videoUrl.startsWith("blob:")) {
-    return project.videoUrl;
+  if (project.videoPath) {
+    return `/api/video/${id}`;
   }
 
   const blob = await getVideoBlob(id);

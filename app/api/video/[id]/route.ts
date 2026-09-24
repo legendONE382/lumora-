@@ -8,17 +8,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const project = getProject(id);
 
-    if (!project || !project.videoPath) {
-      return NextResponse.json(
-        { error: "Video not found" },
-        { status: 404 }
-      );
+    let videoPath: string | undefined;
+
+    if (project?.videoPath) {
+      videoPath = path.isAbsolute(project.videoPath)
+        ? project.videoPath
+        : path.join(process.cwd(), project.videoPath);
+    } else {
+      videoPath = path.join(process.cwd(), "tmp", id, "final.mp4");
     }
 
-    const videoPath = path.isAbsolute(project.videoPath)
-      ? project.videoPath
-      : path.join(process.cwd(), project.videoPath);
-    
     if (!fs.existsSync(videoPath)) {
       return NextResponse.json(
         { error: "Video file not found on disk" },

@@ -44,6 +44,8 @@ function ProjectDetailContent() {
           getProjectVideoUrl(params.id).then((url) => {
             setVideoUrl(url);
           });
+        } else {
+          setVideoUrl(`/api/video/${params.id}`);
         }
       }
     }
