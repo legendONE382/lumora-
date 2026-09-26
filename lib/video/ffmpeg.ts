@@ -101,8 +101,9 @@ async function renderSceneClip(
       "-f", "lavfi",
       "-i", `color=c=black:s=${width}x${height}:d=${duration}:r=${fps}`,
       "-f", "lavfi",
-      "-i", `anullsrc=r=48000:cl=mono`,
-      "-shortest",
+      "-i", `anullsrc=r=48000:cl=mono",
+      "-map", "0:v",
+      "-map", "1:a",
       "-c:v", "libx264",
       "-preset", "fast",
       "-crf", "23",
@@ -110,6 +111,7 @@ async function renderSceneClip(
       "-c:a", "aac",
       "-b:a", "192k",
       "-ar", "48000",
+      "-shortest",
       "-y",
       outputPath,
     ];
@@ -129,19 +131,35 @@ async function renderSceneClip(
       args.push("-i", videoFile);
     }
 
-    args.push(
-      "-map", "0:v",
-      "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,fps=${fps}`,
-      "-c:v", "libx264",
-      "-preset", "fast",
-      "-crf", "23",
-      "-pix_fmt", "yuv420p"
-    );
-
     if (hasAudio && audioPath && fs.existsSync(audioPath)) {
-      args.push("-map", "1:a", "-c:a", "aac", "-b:a", "192k", "-ar", "48000");
+      args.push(
+        "-map", "0:v",
+        "-map", "1:a",
+        "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,fps=${fps}`,
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "48000"
+      );
     } else {
-      args.push("-f", "lavfi", "-i", `anullsrc=r=48000:cl=mono`, "-shortest", "-c:a", "aac", "-b:a", "192k", "-ar", "48000");
+      args.push(
+        "-map", "0:v",
+        "-f", "lavfi",
+        "-i", `anullsrc=r=48000:cl=mono`,
+        "-map", "1:a",
+        "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,fps=${fps}`,
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "48000",
+        "-shortest"
+      );
     }
 
     args.push("-y", outputPath);
@@ -153,24 +171,23 @@ async function renderSceneClip(
     const args: string[] = [
       "-loop", "1",
       "-i", imageFile,
-    ];
-
-    args.push(
+      "-f", "lavfi",
+      "-i", `anullsrc=r=48000:cl=mono`,
+      "-map", "0:v",
+      "-map", "1:a",
       "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},fps=${fps},format=yuv420p,zoompan=z='1+0.08*min(t/${duration},1)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=${width}x${height}:fps=${fps}`,
       "-t", String(duration),
       "-c:v", "libx264",
       "-preset", "fast",
       "-crf", "23",
       "-pix_fmt", "yuv420p",
-      "-f", "lavfi",
-      "-i", `anullsrc=r=48000:cl=mono`,
-      "-shortest",
       "-c:a", "aac",
       "-b:a", "192k",
       "-ar", "48000",
+      "-shortest",
       "-y",
       outputPath,
-    );
+    ];
     await runFFmpeg(args);
     return;
   }
