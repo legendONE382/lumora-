@@ -2,6 +2,7 @@ import { Scene } from "@/types";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
+import { generateSrt, getSubtitlePath } from "./subtitles";
 
 const FFMPEG_BINARY = process.env.FFMPEG_BINARY || "ffmpeg";
 
@@ -11,6 +12,7 @@ export interface RenderOptions {
   width?: number;
   height?: number;
   fps?: number;
+  subtitles?: boolean;
 }
 
 export interface RenderResult {
@@ -165,7 +167,7 @@ async function renderSceneClip(
 }
 
 export async function renderVideoWithFFmpeg(options: RenderOptions): Promise<RenderResult> {
-  const { projectDir, scenes, width = 1080, height = 1920, fps = 30 } = options;
+  const { projectDir, scenes, width = 1080, height = 1920, fps = 30, subtitles = true } = options;
   const outputPath = path.join(projectDir, "final.mp4");
 
   if (!scenes.length) {
@@ -220,6 +222,32 @@ export async function renderVideoWithFFmpeg(options: RenderOptions): Promise<Ren
 
   console.log("[ffmpeg] concatenating scenes");
   await runFFmpeg(args);
+
+  if (subtitles) {
+    try {
+      const subtitlePath = getSubtitlePath(projectDir);
+      generateSrt(scenes, subtitlePath);
+      console.log("[render] burning subtitles into final video");
+
+      const subtitleArgs: string[] = ["-y", "-i", outputPath];
+      const escapedSubPath = subtitlePath.replace(/\\/g, "/");
+      subtitleArgs.push(
+        "-vf", `subtitles=${escapedSubPath}:force_style='FontSize=24,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=30'`,
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        outputPath
+      );
+
+      await runFFmpeg(subtitleArgs);
+      console.log("[render] subtitle burn complete");
+    } catch (error) {
+      console.error("[render] subtitle burn failed:", error);
+    }
+  }
 
   const stats = fs.statSync(outputPath);
   console.log("[ffmpeg] output created:", outputPath, "size:", stats.size);
