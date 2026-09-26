@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { searchPexelsPhotos, searchPexelsVideos, selectBestPhoto, selectBestVideo, downloadPexelsFile, PexelsPhoto, PexelsVideo } from "@/lib/media/pexels";
 import { getProject, saveProject } from "@/lib/projects/storage";
+import { saveServerProject } from "@/lib/projects/server-store";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
     console.log("[generate-visual] saving project...");
     project.plan.scenes = scenes;
     saveProject(project);
+    saveServerProject(project);
     console.log("[generate-visual] saved");
 
     const response = { scenes, count: scenes.length };

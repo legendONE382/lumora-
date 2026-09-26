@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateNarration } from "@/lib/audio/piper";
 import { getProject, saveProject } from "@/lib/projects/storage";
+import { saveServerProject } from "@/lib/projects/server-store";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
     });
 
     saveProject(project);
+    saveServerProject(project);
 
     console.log("[generate-audio] done");
     return NextResponse.json({ audioDataUrls });

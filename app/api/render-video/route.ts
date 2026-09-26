@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getProject, saveProject, updateProjectStatus } from "@/lib/projects/storage";
+import { saveServerProject } from "@/lib/projects/server-store";
 import { renderVideoWithFFmpeg } from "@/lib/video/ffmpeg";
 import path from "node:path";
 import fs from "node:fs";
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
     project.videoUrl = `/api/video/${projectId}`;
     project.status = "completed";
     saveProject(project);
+    saveServerProject(project);
 
     const savedProject = getProject(projectId);
     console.log("[render] verified saved project:", { videoPath: savedProject?.videoPath, status: savedProject?.status });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateCreativePlan } from "@/lib/ai/gemini";
 import { getProject, saveProject } from "@/lib/projects/storage";
+import { saveServerProject } from "@/lib/projects/server-store";
 
 export async function POST(request: Request) {
   try {
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
     project.title = plan.title;
     project.status = "generating";
     saveProject(project);
+    saveServerProject(project);
 
     return NextResponse.json({ plan });
   } catch (error) {

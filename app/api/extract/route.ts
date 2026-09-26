@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractUrlContent, extractTextContent } from "@/lib/ingestion/extractor";
 import { saveProject } from "@/lib/projects/storage";
+import { saveServerProject } from "@/lib/projects/server-store";
 import { Project } from "@/types";
 
 export async function POST(request: Request) {
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
     };
 
     saveProject(project);
+    saveServerProject(project);
 
     return NextResponse.json({ projectId: project.id, content: extractedContent, project });
   } catch (error) {
