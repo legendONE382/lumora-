@@ -100,11 +100,16 @@ async function renderSceneClip(
     const args = [
       "-f", "lavfi",
       "-i", `color=c=black:s=${width}x${height}:d=${duration}:r=${fps}`,
+      "-f", "lavfi",
+      "-i", `anullsrc=r=48000:cl=mono`,
+      "-shortest",
       "-c:v", "libx264",
       "-preset", "fast",
       "-crf", "23",
       "-pix_fmt", "yuv420p",
-      "-an",
+      "-c:a", "aac",
+      "-b:a", "192k",
+      "-ar", "48000",
       "-y",
       outputPath,
     ];
@@ -136,7 +141,7 @@ async function renderSceneClip(
     if (hasAudio && audioPath && fs.existsSync(audioPath)) {
       args.push("-map", "1:a", "-c:a", "aac", "-b:a", "192k", "-ar", "48000");
     } else {
-      args.push("-an");
+      args.push("-f", "lavfi", "-i", `anullsrc=r=48000:cl=mono`, "-shortest", "-c:a", "aac", "-b:a", "192k", "-ar", "48000");
     }
 
     args.push("-y", outputPath);
@@ -157,7 +162,12 @@ async function renderSceneClip(
       "-preset", "fast",
       "-crf", "23",
       "-pix_fmt", "yuv420p",
-      "-an",
+      "-f", "lavfi",
+      "-i", `anullsrc=r=48000:cl=mono`,
+      "-shortest",
+      "-c:a", "aac",
+      "-b:a", "192k",
+      "-ar", "48000",
       "-y",
       outputPath,
     );
@@ -205,49 +215,64 @@ export async function renderVideoWithFFmpeg(options: RenderOptions): Promise<Ren
     args.push("-i", clip);
   });
 
-  args.push(
-    "-filter_complex", concatFilter,
-    "-map", "[outv]",
-    "-map", "[outa]",
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "23",
-    "-pix_fmt", "yuv420p",
-    "-c:a", "aac",
-    "-b:a", "192k",
-    "-ar", "48000",
-    "-movflags", "+faststart",
-    outputPath
-  );
-
-  console.log("[ffmpeg] concatenating scenes");
-  await runFFmpeg(args);
-
   if (subtitles) {
     try {
       const subtitlePath = getSubtitlePath(projectDir);
       generateSrt(scenes, subtitlePath);
       console.log("[render] burning subtitles into final video");
-
-      const subtitleArgs: string[] = ["-y", "-i", outputPath];
       const escapedSubPath = subtitlePath.replace(/\\/g, "/");
-      subtitleArgs.push(
-        "-vf", `subtitles=${escapedSubPath}:force_style='FontSize=24,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=30'`,
+      const subtitleFilter = `subtitles=${escapedSubPath}:force_style='FontSize=24,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=30'`;
+      
+      args.push(
+        "-filter_complex", `${concatFilter};[outv]${subtitleFilter}[outv_sub]`,
+        "-map", "[outv_sub]",
+        "-map", "[outa]",
         "-c:v", "libx264",
         "-preset", "fast",
         "-crf", "23",
         "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "48000",
         "-movflags", "+faststart",
         outputPath
       );
-
-      await runFFmpeg(subtitleArgs);
-      console.log("[render] subtitle burn complete");
     } catch (error) {
-      console.error("[render] subtitle burn failed:", error);
+      console.error("[render] subtitle generation failed:", error);
+      args.push(
+        "-filter_complex", concatFilter,
+        "-map", "[outv]",
+        "-map", "[outa]",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "48000",
+        "-movflags", "+faststart",
+        outputPath
+      );
     }
+  } else {
+    args.push(
+      "-filter_complex", concatFilter,
+      "-map", "[outv]",
+      "-map", "[outa]",
+      "-c:v", "libx264",
+      "-preset", "fast",
+      "-crf", "23",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac",
+      "-b:a", "192k",
+      "-ar", "48000",
+      "-movflags", "+faststart",
+      outputPath
+    );
   }
+
+  console.log("[ffmpeg] concatenating scenes");
+  await runFFmpeg(args);
 
   const stats = fs.statSync(outputPath);
   console.log("[ffmpeg] output created:", outputPath, "size:", stats.size);
