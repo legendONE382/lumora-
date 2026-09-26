@@ -48,15 +48,32 @@ export default function VideoPlayer({ videoUrl, title, onRevise }: VideoPlayerPr
   };
 
   const handleDownload = async () => {
-    const response = await fetch(videoUrl);
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    try {
+      const response = await fetch(videoUrl);
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `${title.replace(/\s+/g, "_")}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("[VideoPlayer] download failed:", error);
+      alert(`Download failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  };
+
+  const handleDirectDownload = () => {
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title.replace(/\s+/g, "_")}.webm`;
+    a.href = videoUrl;
+    a.download = `${title.replace(/\s+/g, "_")}.mp4`;
     document.body.appendChild(a);
     a.click();
-    window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   };
 
@@ -92,7 +109,7 @@ export default function VideoPlayer({ videoUrl, title, onRevise }: VideoPlayerPr
         <h3 className="text-base font-semibold text-white truncate">{title}</h3>
         <div className="flex gap-2">
           <button
-            onClick={handleDownload}
+            onClick={handleDirectDownload}
             className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
           >
             <Download className="h-4 w-4" />
