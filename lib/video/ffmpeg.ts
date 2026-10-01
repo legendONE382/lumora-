@@ -101,7 +101,7 @@ async function renderSceneClip(
       "-f", "lavfi",
       "-i", `color=c=black:s=${width}x${height}:d=${duration}:r=${fps}`,
       "-f", "lavfi",
-      "-i", `anullsrc=r=48000:cl=mono",
+      "-i", `anullsrc=r=48000:cl=mono`,
       "-map", "0:v",
       "-map", "1:a",
       "-c:v", "libx264",
@@ -146,9 +146,9 @@ async function renderSceneClip(
       );
     } else {
       args.push(
-        "-map", "0:v",
         "-f", "lavfi",
         "-i", `anullsrc=r=48000:cl=mono`,
+        "-map", "0:v",
         "-map", "1:a",
         "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,fps=${fps}`,
         "-c:v", "libx264",
@@ -237,8 +237,8 @@ export async function renderVideoWithFFmpeg(options: RenderOptions): Promise<Ren
       const subtitlePath = getSubtitlePath(projectDir);
       generateSrt(scenes, subtitlePath);
       console.log("[render] burning subtitles into final video");
-      const escapedSubPath = subtitlePath.replace(/\\/g, "/");
-      const subtitleFilter = `subtitles=${escapedSubPath}:force_style='FontSize=24,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=30'`;
+      const relativeSubPath = path.relative(process.cwd(), subtitlePath).replace(/\\/g, "/");
+      const subtitleFilter = `subtitles=${relativeSubPath}:force_style='FontSize=24,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=30'`;
       
       args.push(
         "-filter_complex", `${concatFilter};[outv]${subtitleFilter}[outv_sub]`,

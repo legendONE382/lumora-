@@ -5,6 +5,8 @@ import { renderVideoWithFFmpeg } from "@/lib/video/ffmpeg";
 import path from "node:path";
 import fs from "node:fs";
 
+export const maxDuration = 600;
+
 export async function POST(request: Request) {
   console.log("[render-video] POST handler start");
   let projectId: string | undefined;

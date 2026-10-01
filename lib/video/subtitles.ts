@@ -13,9 +13,7 @@ function escapeSrtText(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+    .replace(/>/g, "&gt;");
 }
 
 function formatSrtTime(seconds: number): string {
@@ -56,6 +54,28 @@ function splitIntoLines(text: string, maxWordsPerLine: number = 6, maxLines: num
   return lines;
 }
 
+function chunkNarration(text: string, maxWordsPerChunk: number = 8): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+
+  const chunks: string[] = [];
+  let current: string[] = [];
+
+  for (const word of words) {
+    current.push(word);
+    if (current.length >= maxWordsPerChunk) {
+      chunks.push(current.join(" "));
+      current = [];
+    }
+  }
+
+  if (current.length) {
+    chunks.push(current.join(" "));
+  }
+
+  return chunks;
+}
+
 export function buildSubtitleEntries(scenes: Scene[]): SubtitleEntry[] {
   const entries: SubtitleEntry[] = [];
   let currentTime = 0;
@@ -67,19 +87,28 @@ export function buildSubtitleEntries(scenes: Scene[]): SubtitleEntry[] {
       continue;
     }
 
-    const lines = splitIntoLines(narration, 6, 2);
-    const subtitleText = lines.join("\\N");
-    const start = currentTime;
-    const end = currentTime + scene.duration;
+    const chunks = chunkNarration(narration, 8);
+    if (!chunks.length) {
+      currentTime += scene.duration;
+      continue;
+    }
 
-    entries.push({
-      index: entries.length + 1,
-      start,
-      end,
-      text: subtitleText,
-    });
+    const chunkDuration = scene.duration / chunks.length;
+    for (let i = 0; i < chunks.length; i++) {
+      const lines = splitIntoLines(chunks[i], 6, 2);
+      const subtitleText = lines.join("\n");
+      const start = currentTime + i * chunkDuration;
+      const end = start + chunkDuration;
 
-    currentTime = end;
+      entries.push({
+        index: entries.length + 1,
+        start,
+        end,
+        text: subtitleText,
+      });
+    }
+
+    currentTime += scene.duration;
   }
 
   return entries;
