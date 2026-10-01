@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getProject, saveProject, updateProjectStatus } from "@/lib/projects/storage";
-import { saveServerProject } from "@/lib/projects/server-store";
+import { getServerProject, saveServerProject } from "@/lib/projects/server-store";
 import { renderVideoWithFFmpeg } from "@/lib/video/ffmpeg";
 import path from "node:path";
 import fs from "node:fs";
@@ -24,7 +24,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const project = getProject(projectId);
+    let project = getProject(projectId);
+    if (!project) {
+      project = getServerProject(projectId);
+    }
     if (!project) {
       return NextResponse.json(
         { error: "Project not found" },
