@@ -18,15 +18,51 @@ function clientGetProjects(): Project[] {
   }
 }
 
+function stripLargeClientFields(project: Project): Project {
+  return {
+    ...project,
+    plan: {
+      ...project.plan,
+      scenes: project.plan.scenes.map((scene) => ({
+        ...scene,
+        audioUrl: undefined,
+      })),
+    },
+  };
+}
+
 function clientSaveProject(project: Project): void {
-  const projects = clientGetProjects();
-  const existingIndex = projects.findIndex((p) => p.id === project.id);
-  if (existingIndex >= 0) {
-    projects[existingIndex] = { ...project, updatedAt: new Date().toISOString() };
-  } else {
-    projects.unshift(project);
+  try {
+    const projects = clientGetProjects();
+    const existingIndex = projects.findIndex((p) => p.id === project.id);
+    const stored = stripLargeClientFields(project);
+    if (existingIndex >= 0) {
+      projects[existingIndex] = { ...stored, updatedAt: new Date().toISOString() };
+    } else {
+      projects.unshift(stored);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  } catch (error) {
+    if (error instanceof Error && error.name === "QuotaExceededError") {
+      console.warn("[storage] localStorage quota exceeded, pruning old projects...");
+      try {
+        let projects = clientGetProjects();
+        const existingIndex = projects.findIndex((p) => p.id === project.id);
+        const stored = stripLargeClientFields(project);
+        if (existingIndex >= 0) {
+          projects[existingIndex] = { ...stored, updatedAt: new Date().toISOString() };
+        } else {
+          projects.unshift(stored);
+        }
+        const trimmed = projects.slice(0, 10);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+      } catch (retryError) {
+        console.error("[storage] failed to save project after pruning:", retryError);
+      }
+    } else {
+      console.error("[storage] failed to save project:", error);
+    }
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
 }
 
 export function getProjects(): Project[] {
@@ -56,8 +92,12 @@ export function deleteProject(id: string): void {
     serverStore.delete(id);
     return;
   }
-  const projects = clientGetProjects().filter((p) => p.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  try {
+    const projects = clientGetProjects().filter((p) => p.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  } catch (error) {
+    console.error("[storage] failed to delete project:", error);
+  }
 }
 
 export function updateProjectStatus(
