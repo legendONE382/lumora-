@@ -91,10 +91,12 @@ async function renderSceneClip(
   height: number,
   fps: number,
   hasAudio: boolean,
-  audioPath?: string
+  audioPath?: string,
+  videoFileOverride?: string,
+  imageFileOverride?: string
 ): Promise<void> {
-  const videoFile = getVideoFileForScene(sceneDir);
-  const imageFile = getVideoFileForScene(sceneDir) || getImageFileForScene(sceneDir);
+  const videoFile = videoFileOverride || getVideoFileForScene(sceneDir);
+  const imageFile = imageFileOverride || getImageFileForScene(sceneDir);
 
   if (!videoFile && !imageFile) {
     const args = [
@@ -175,7 +177,7 @@ async function renderSceneClip(
       "-i", `anullsrc=r=48000:cl=mono`,
       "-map", "0:v",
       "-map", "1:a",
-      "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},fps=${fps},format=yuv420p,zoompan=z='1+0.08*min(t/${duration},1)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=${width}x${height}:fps=${fps}`,
+      "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},fps=${fps},format=yuv420p,zoompan=z='1+0.08*if(gt(t,${duration}),1,t/${duration})':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=${width}x${height}:fps=${fps}`,
       "-t", String(duration),
       "-c:v", "libx264",
       "-preset", "fast",
@@ -209,12 +211,24 @@ export async function renderVideoWithFFmpeg(options: RenderOptions): Promise<Ren
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
-    const sceneDir = path.join(projectDir, `scene-${i + 1}`);
+    const sceneIndex = (scene as any)._sceneIndex || i + 1;
+    const sceneDir = path.join(projectDir, `scene-${sceneIndex}`);
     const clipPath = path.join(clipsDir, `clip-${i + 1}.mp4`);
 
     const audioPath = scene.audioPath && fs.existsSync(scene.audioPath) ? scene.audioPath : undefined;
 
-    await renderSceneClip(sceneDir, clipPath, scene.duration, width, height, fps, !!audioPath, audioPath);
+    await renderSceneClip(
+      sceneDir,
+      clipPath,
+      scene.duration,
+      width,
+      height,
+      fps,
+      !!audioPath,
+      audioPath,
+      (scene as any)._videoFile,
+      (scene as any)._imageFile
+    );
     clipPaths.push(clipPath);
     console.log(`[ffmpeg] scene ${i + 1} rendered`);
   }

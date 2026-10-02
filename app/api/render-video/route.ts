@@ -5,6 +5,21 @@ import { renderVideoWithFFmpeg } from "@/lib/video/ffmpeg";
 import path from "node:path";
 import fs from "node:fs";
 
+function getImageFileForScene(sceneDir: string): string | null {
+  const candidates = [
+    path.join(sceneDir, "scene.jpg"),
+    path.join(sceneDir, "scene.jpeg"),
+    path.join(sceneDir, "scene.png"),
+    path.join(sceneDir, "scene.webp"),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 export const maxDuration = 600;
 
 export async function POST(request: Request) {
@@ -55,18 +70,27 @@ export async function POST(request: Request) {
 
     const sceneFiles: string[] = [];
     const audioFiles: string[] = [];
+    const validScenes: any[] = [];
 
     for (let i = 0; i < project.plan.scenes.length; i++) {
       const scene = project.plan.scenes[i];
       const sceneDir = path.join(projectDir, `scene-${i + 1}`);
       const videoFile = path.join(sceneDir, "scene.mp4");
+      const imageFile = getImageFileForScene(sceneDir);
 
-      if (fs.existsSync(videoFile)) {
-        const stats = fs.statSync(videoFile);
-        sceneFiles.push(videoFile);
-        console.log(`[render] scene ${i + 1}: path=${videoFile} size=${stats.size}`);
+      const hasVideo = fs.existsSync(videoFile);
+      const hasImage = !!imageFile;
+
+      if (hasVideo || hasImage) {
+        validScenes.push({
+          ...scene,
+          _sceneIndex: i + 1,
+          _videoFile: hasVideo ? videoFile : undefined,
+          _imageFile: imageFile || undefined,
+        });
+        console.log(`[render] scene ${i + 1}: valid (video=${hasVideo}, image=${hasImage})`);
       } else {
-        console.warn(`[render] scene ${i + 1}: video file not found at ${videoFile}`);
+        console.warn(`[render] scene ${i + 1}: missing media, skipping`);
       }
 
       if (scene.audioPath && fs.existsSync(scene.audioPath)) {
@@ -76,11 +100,14 @@ export async function POST(request: Request) {
       }
     }
 
-    console.log("[render] scene files found:", sceneFiles.length);
+    console.log("[render] valid scenes:", validScenes.length, "of", project.plan.scenes.length);
     console.log("[render] audio files found:", audioFiles.length);
 
-    if (!sceneFiles.length) {
-      throw new Error("No scene video files found to render");
+    if (!validScenes.length) {
+      return NextResponse.json(
+        { error: "No scene media files found to render" },
+        { status: 400 }
+      );
     }
 
     console.log("[render] starting ffmpeg render");
@@ -88,7 +115,7 @@ export async function POST(request: Request) {
 
     const result = await renderVideoWithFFmpeg({
       projectDir,
-      scenes: project.plan.scenes,
+      scenes: validScenes,
     });
 
     const elapsed = Date.now() - startTime;
