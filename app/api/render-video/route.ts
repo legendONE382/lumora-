@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProject, saveProject, updateProjectStatus } from "@/lib/projects/storage";
 import { getServerProject, saveServerProject } from "@/lib/projects/server-store";
-import { renderVideoWithFFmpeg } from "@/lib/video/ffmpeg";
+import { renderVideoWithFFmpeg, selectMusicPath } from "@/lib/video/ffmpeg";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -113,9 +113,13 @@ export async function POST(request: Request) {
     console.log("[render] starting ffmpeg render");
     const startTime = Date.now();
 
+    const musicPath = selectMusicPath(project.plan.tone) || undefined;
+    console.log("[render] music:", musicPath || "none");
+
     const result = await renderVideoWithFFmpeg({
       projectDir,
       scenes: validScenes,
+      musicPath,
     });
 
     const elapsed = Date.now() - startTime;
