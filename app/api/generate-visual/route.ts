@@ -145,7 +145,9 @@ export async function POST(request: Request) {
               videoUrl: isVideo ? localPath : "",
               source,
             };
-            fallbackAssets.push({ imageUrl: localPath, videoUrl: isVideo ? localPath : "", source });
+            if (localPath && fs.existsSync(localPath)) {
+              fallbackAssets.push({ imageUrl: localPath, videoUrl: isVideo ? localPath : "", source });
+            }
             return result;
           }
 
@@ -163,14 +165,19 @@ export async function POST(request: Request) {
       const sceneIndex = plan.scenes.findIndex((s: any) => s.id === scene.id);
       if (sceneIndex < 0) continue;
 
-      if (fallbackAssets.length > 0) {
-        const reused = fallbackAssets[0];
+      const reused = fallbackAssets.find((asset) => {
+        const sourcePath = asset.videoUrl || asset.imageUrl || "";
+        return sourcePath && fs.existsSync(sourcePath);
+      });
+
+      if (reused) {
         const sceneDir = path.join(projectDir, `scene-${sceneIndex + 1}`);
         fs.mkdirSync(sceneDir, { recursive: true });
 
         const ext = reused.videoUrl ? ".mp4" : ".jpg";
         const destPath = path.join(sceneDir, `scene${ext}`);
-        await fs.promises.copyFile(reused.videoUrl || reused.imageUrl!, destPath);
+        const sourcePath = reused.videoUrl || reused.imageUrl!;
+        await fs.promises.copyFile(sourcePath, destPath);
 
         const isVideo = !!reused.videoUrl;
         console.warn(`[generate-visual] scene ${sceneIndex + 1} reused ${isVideo ? "video" : "photo"} from another scene`);
