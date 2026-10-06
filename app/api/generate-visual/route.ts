@@ -49,23 +49,16 @@ async function resolveSceneMedia(queries: string[]): Promise<{ photo: PexelsPhot
 
   let bestPhoto: PexelsPhoto | null = null;
   let bestVideo: PexelsVideo | null = null;
-  let bestPhotoScore = -1;
-  let bestVideoScore = -1;
 
   for (const { photos, videos } of searchResults) {
-    for (const photo of photos) {
-      const score = (photo.width * photo.height) + (photo.width >= 1080 ? 10000 : 0);
-      if (score > bestPhotoScore) {
-        bestPhotoScore = score;
-        bestPhoto = photo;
-      }
+    const candidatePhoto = selectBestPhoto(photos, "");
+    const candidateVideo = selectBestVideo(videos, "");
+
+    if (candidateVideo && (!bestVideo || (candidateVideo.width * candidateVideo.height) > (bestVideo.width * bestVideo.height))) {
+      bestVideo = candidateVideo;
     }
-    for (const video of videos) {
-      const score = (video.width * video.height) + (video.duration >= 5 && video.duration <= 30 ? 5000 : 0);
-      if (score > bestVideoScore) {
-        bestVideoScore = score;
-        bestVideo = video;
-      }
+    if (candidatePhoto && (!bestPhoto || (candidatePhoto.width * candidatePhoto.height) > (bestPhoto.width * bestPhoto.height))) {
+      bestPhoto = candidatePhoto;
     }
   }
 
@@ -96,8 +89,6 @@ export async function POST(request: Request) {
 
     const projectDir = path.join(process.cwd(), "tmp", projectId);
     fs.mkdirSync(projectDir, { recursive: true });
-
-    const fallbackAssets: { imageUrl?: string; videoUrl?: string; source?: any }[] = [];
 
     const scenes = await Promise.all(
       plan.scenes.map(async (scene: any, index: number) => {
@@ -145,9 +136,6 @@ export async function POST(request: Request) {
               videoUrl: isVideo ? localPath : "",
               source,
             };
-            if (localPath && fs.existsSync(localPath)) {
-              fallbackAssets.push({ imageUrl: localPath, videoUrl: isVideo ? localPath : "", source });
-            }
             return result;
           }
 
@@ -159,34 +147,6 @@ export async function POST(request: Request) {
         }
       })
     );
-
-    const unresolved = scenes.filter((s) => !s.imageUrl && !s.videoUrl);
-    for (const scene of unresolved) {
-      const sceneIndex = plan.scenes.findIndex((s: any) => s.id === scene.id);
-      if (sceneIndex < 0) continue;
-
-      const reused = fallbackAssets.find((asset) => {
-        const sourcePath = asset.videoUrl || asset.imageUrl || "";
-        return sourcePath && fs.existsSync(sourcePath);
-      });
-
-      if (reused) {
-        const sceneDir = path.join(projectDir, `scene-${sceneIndex + 1}`);
-        fs.mkdirSync(sceneDir, { recursive: true });
-
-        const ext = reused.videoUrl ? ".mp4" : ".jpg";
-        const destPath = path.join(sceneDir, `scene${ext}`);
-        const sourcePath = reused.videoUrl || reused.imageUrl!;
-        await fs.promises.copyFile(sourcePath, destPath);
-
-        const isVideo = !!reused.videoUrl;
-        console.warn(`[generate-visual] scene ${sceneIndex + 1} reused ${isVideo ? "video" : "photo"} from another scene`);
-        
-        scene.imageUrl = destPath;
-        scene.videoUrl = isVideo ? destPath : "";
-        scene.source = { ...reused.source, reused: true };
-      }
-    }
 
     console.log("[generate-visual] saving project...");
     project.plan.scenes = scenes;

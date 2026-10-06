@@ -288,7 +288,7 @@ export async function renderVideoWithFFmpeg(options: RenderOptions): Promise<Ren
 
   const buildMusicFilter = (musicInputIndex: number, duration: number): string => {
     const escaped = musicPath!.replace(/\\/g, "/");
-    return `[${musicInputIndex}:a]aloop=loop=-1:size=2e9,atrim=0:${duration},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=2,afade=t=out:st=${Math.max(0, duration - 3)}:d=3,volume=0.15[bg]`;
+    return `[${musicInputIndex}:a]aloop=loop=-1:size=2e9,atrim=0:${duration},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=2,afade=t=out:st=${Math.max(0, duration - 3)}:d=3,volume=0.3[bg]`;
   };
 
   if (musicPath && fs.existsSync(musicPath)) {
