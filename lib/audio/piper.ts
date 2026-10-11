@@ -3,9 +3,9 @@ import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs";
 
-const PIPER_VOICE_DIR = process.env.PIPER_VOICE_DIR || path.join(process.cwd(), "tmp", "piper-voices");
+const PIPER_VOICE_DIR = process.env.PIPER_VOICE_DIR || path.join(process.cwd(), "voices");
 const PIPER_MODEL = process.env.PIPER_MODEL || "en_US-amy-medium";
-const PIPER_BINARY = process.env.PIPER_BINARY || "python";
+const PIPER_BINARY = process.env.PIPER_BINARY || (process.platform === "win32" ? "python" : "python3");
 const PIPER_SCRIPT = process.env.PIPER_SCRIPT || "-m";
 const PIPER_MODULE = process.env.PIPER_MODULE || "piper";
 

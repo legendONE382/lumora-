@@ -1,0 +1,39 @@
+# Keep the build context small and reproducible.
+# Note: `public/demo/example.mp4` and `voices/*` ARE needed by the app,
+# so they are deliberately NOT excluded here.
+
+node_modules
+.next
+out
+dist
+build
+coverage
+
+# Never ship secrets or generated media into the image
+.env
+.env.local
+.env.*.local
+tmp
+uploads
+generated
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+*.swp
+*.swo
+
+# Temp + build metadata
+*.tmp
+*.temp
+tsconfig.tsbuildinfo
+
+# Local tooling
+.kilo

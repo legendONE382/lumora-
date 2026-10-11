@@ -1,0 +1,58 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploys Lumora AI as a Docker web service. The Docker image bundles
+# FFmpeg (with libass), fonts, Python and piper-tts, so no system
+# packages need to be installed on the host.
+#
+# Deploy:
+#   1. Push this repo to GitHub.
+#   2. Render Dashboard -> New -> Blueprint -> pick this repo.
+#   3. Fill in the `sync: false` values when prompted (they stay secret).
+#   4. Deploy.
+
+services:
+  - type: web
+    name: lumora
+    runtime: docker
+    plan: standard
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+
+      # --- Secrets: set these in the Render dashboard ---
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PEXELS_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+
+      # --- Narration (Piper) ---
+      # The bundled Dockerfile installs piper-tts and ships the voice model
+      # in ./voices, so these values already match the image.
+      - key: PIPER_BINARY
+        value: python3
+      - key: PIPER_VOICE_DIR
+        value: /app/voices
+      - key: PIPER_MODEL
+        value: en_US-amy-medium
+
+      # Optional: only set this if `ffmpeg` is not already on PATH inside the image.
+      # - key: FFMPEG_BINARY
+      #   value: ffmpeg
+
+# Disk for generated media. Without this, renders are lost whenever the
+# service is redeployed or restarted — acceptable for demos, but add a
+# paid Render Disk if you need projects to persist across deploys.
+# disks:
+#   - name: lumora-media
+#     mountPath: /app/tmp
+#     sizeGB: 10

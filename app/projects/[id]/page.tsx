@@ -17,36 +17,37 @@ function ProjectDetailContent() {
 
   useEffect(() => {
     setMounted(true);
-    if (params.id && typeof params.id === "string") {
-      let p = getProject(params.id);
-      
-      if (!p) {
-        fetch(`/api/projects/${params.id}`)
-          .then((res) => {
-            if (!res.ok) throw new Error("Project not found");
-            return res.json();
-          })
-          .then((project) => {
-            saveProject(project);
-            setProject(project);
-            if (project?.videoUrl) {
-              getProjectVideoUrl(params.id).then((url) => {
-                setVideoUrl(url);
-              });
-            }
-          })
-          .catch(() => {
-            setProject(null);
-          });
+    const id = typeof params.id === "string" ? params.id : Array.isArray(params.id) ? params.id[0] : undefined;
+    if (!id) return;
+
+    let p = getProject(id);
+
+    if (!p) {
+      fetch(`/api/projects/${id}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Project not found");
+          return res.json();
+        })
+        .then((project) => {
+          saveProject(project);
+          setProject(project);
+          if (project?.videoUrl) {
+            getProjectVideoUrl(id).then((url) => {
+              setVideoUrl(url);
+            });
+          }
+        })
+        .catch(() => {
+          setProject(null);
+        });
+    } else {
+      setProject(p);
+      if (p?.videoUrl) {
+        getProjectVideoUrl(id).then((url) => {
+          setVideoUrl(url);
+        });
       } else {
-        setProject(p);
-        if (p?.videoUrl) {
-          getProjectVideoUrl(params.id).then((url) => {
-            setVideoUrl(url);
-          });
-        } else {
-          setVideoUrl(`/api/video/${params.id}`);
-        }
+        setVideoUrl(`/api/video/${id}`);
       }
     }
   }, [params.id]);
