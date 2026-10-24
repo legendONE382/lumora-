@@ -58,4 +58,4 @@ RUN npm run build
 EXPOSE 3000
 
 # Render provides a PORT env var; fall back to 3000 for local docker runs.
-CMD ["sh", "-c", "next start -p ${PORT:-3000} -H 0.0.0.0"]
+CMD ["sh", "-c", "npm start -- -p ${PORT:-3000} -H 0.0.0.0"]
