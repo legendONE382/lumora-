@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProject, saveProject, updateProjectStatus } from "@/lib/projects/storage";
-import { getServerProject, saveServerProject } from "@/lib/projects/server-store";
+import { getServerProject, saveServerProject, updateServerProjectStatus } from "@/lib/projects/server-store";
 import { renderVideoWithFFmpeg, selectMusicPath } from "@/lib/video/ffmpeg";
 import path from "node:path";
 import fs from "node:fs";
@@ -39,10 +38,7 @@ export async function POST(request: Request) {
       );
     }
 
-    let project = getProject(projectId);
-    if (!project) {
-      project = getServerProject(projectId);
-    }
+    let project = getServerProject(projectId);
     if (!project) {
       return NextResponse.json(
         { error: "Project not found" },
@@ -57,7 +53,7 @@ export async function POST(request: Request) {
       );
     }
 
-    updateProjectStatus(projectId, "rendering");
+    updateServerProjectStatus(projectId, "rendering");
 
     const projectDir = path.join(process.cwd(), "tmp", projectId);
     fs.mkdirSync(projectDir, { recursive: true });
@@ -134,10 +130,9 @@ export async function POST(request: Request) {
     project.videoPath = result.outputPath;
     project.videoUrl = `/api/video/${projectId}`;
     project.status = "completed";
-    saveProject(project);
     saveServerProject(project);
 
-    const savedProject = getProject(projectId);
+    const savedProject = getServerProject(projectId);
     console.log("[render] verified saved project:", { videoPath: savedProject?.videoPath, status: savedProject?.status });
 
     console.log("[render] returning response");
@@ -154,7 +149,7 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Rendering failed";
 
     if (projectId) {
-      updateProjectStatus(projectId, "error", message);
+      updateServerProjectStatus(projectId, "error", message);
     }
 
     return NextResponse.json(

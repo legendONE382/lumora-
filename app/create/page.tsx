@@ -3,6 +3,22 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getProject, saveProject, updateProjectStatus } from "@/lib/projects/storage";
+
+async function fetchProject(id: string): Promise<any> {
+  const res = await fetch(`/api/projects/${id}`);
+  if (!res.ok) throw new Error("Project not found");
+  const project = await res.json();
+  saveProject(project);
+  return project;
+}
+
+async function getProjectSafe(id: string): Promise<any> {
+  let p = getProject(id);
+  if (!p) {
+    p = await fetchProject(id);
+  }
+  return p;
+}
 import Header from "@/components/Header";
 import { Project, Scene } from "@/types";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
@@ -71,7 +87,7 @@ function CreateContent() {
       if (!planRes.ok) throw new Error("Failed to generate plan");
       const { plan } = await planRes.json();
 
-      const currentProject = getProject(projectId);
+      const currentProject = await getProjectSafe(projectId);
       if (!currentProject) throw new Error("Project lost");
       currentProject.plan = plan;
       saveProject(currentProject);
@@ -87,7 +103,7 @@ function CreateContent() {
       if (!visualsRes.ok) throw new Error("Failed to generate visuals");
       const { scenes: visualScenes } = await visualsRes.json();
 
-      const projectAfterVisuals = getProject(projectId);
+      const projectAfterVisuals = await getProjectSafe(projectId);
       if (!projectAfterVisuals) throw new Error("Project lost during visuals");
       projectAfterVisuals.plan.scenes = visualScenes;
       saveProject(projectAfterVisuals);
@@ -102,9 +118,9 @@ function CreateContent() {
       if (!audioRes.ok) throw new Error("Failed to generate audio");
       const { audioDataUrls } = await audioRes.json();
 
-      const projectAfterAudio = getProject(projectId);
+      const projectAfterAudio = await getProjectSafe(projectId);
       if (!projectAfterAudio) throw new Error("Project lost during audio");
-      projectAfterAudio.plan.scenes = projectAfterAudio.plan.scenes.map((scene) => {
+      projectAfterAudio.plan.scenes = projectAfterAudio.plan.scenes.map((scene: any) => {
         const audioData = audioDataUrls.find((a: any) => a.sceneId === scene.id);
         return {
           ...scene,

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateCreativePlan } from "@/lib/ai/gemini";
-import { getProject, saveProject } from "@/lib/projects/storage";
-import { saveServerProject } from "@/lib/projects/server-store";
+import { getServerProject, saveServerProject } from "@/lib/projects/server-store";
 
 export async function POST(request: Request) {
   try {
@@ -17,7 +16,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const project = getProject(projectId);
+    const project = getServerProject(projectId);
     if (!project) {
       console.log("[generate-plan] project not found:", projectId);
       return NextResponse.json(
@@ -33,7 +32,6 @@ export async function POST(request: Request) {
     project.plan = plan;
     project.title = plan.title;
     project.status = "generating";
-    saveProject(project);
     saveServerProject(project);
 
     return NextResponse.json({ plan });
