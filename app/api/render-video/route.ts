@@ -1,25 +1,11 @@
 import { NextResponse } from "next/server";
-import { getServerProject, saveServerProject, updateServerProjectStatus } from "@/lib/projects/server-store";
-import { renderVideoWithFFmpeg, selectMusicPath } from "@/lib/video/ffmpeg";
+import { getServerProject, updateServerProjectStatus } from "@/lib/projects/server-store";
+import { isRenderActive, runRenderJob } from "@/lib/video/render-job";
 import path from "node:path";
 import fs from "node:fs";
+import { DATA_DIR } from "@/lib/projects/server-store";
 
-function getImageFileForScene(sceneDir: string): string | null {
-  const candidates = [
-    path.join(sceneDir, "scene.jpg"),
-    path.join(sceneDir, "scene.jpeg"),
-    path.join(sceneDir, "scene.png"),
-    path.join(sceneDir, "scene.webp"),
-  ];
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-export const maxDuration = 600;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   console.log("[render-video] POST handler start");
@@ -38,123 +24,79 @@ export async function POST(request: Request) {
       );
     }
 
-    let project = getServerProject(projectId);
+    const project = getServerProject(projectId);
     if (!project) {
+      console.warn("[render-video] project not found:", projectId);
       return NextResponse.json(
         { error: "Project not found" },
         { status: 404 }
       );
     }
 
-    if (!project.plan.scenes.length) {
+    if (!project.plan?.scenes?.length) {
       return NextResponse.json(
         { error: "No scenes to render" },
         { status: 400 }
       );
     }
 
-    updateServerProjectStatus(projectId, "rendering");
-
-    const projectDir = path.join(process.cwd(), "tmp", projectId);
-    fs.mkdirSync(projectDir, { recursive: true });
-
-    console.log("[render-video] project loaded:", {
-      projectId,
-      sceneCount: project.plan.scenes.length,
-      projectDir,
-    });
-
-    const sceneFiles: string[] = [];
-    const audioFiles: string[] = [];
-    const validScenes: any[] = [];
-
-    for (let i = 0; i < project.plan.scenes.length; i++) {
-      const scene = project.plan.scenes[i];
-      const sceneDir = path.join(projectDir, `scene-${i + 1}`);
-      const videoFile = path.join(sceneDir, "scene.mp4");
-      const imageFile = getImageFileForScene(sceneDir);
-
-      const hasVideo = fs.existsSync(videoFile);
-      const hasImage = !!imageFile;
-
-      if (hasVideo || hasImage) {
-        validScenes.push({
-          ...scene,
-          _sceneIndex: i + 1,
-          _videoFile: hasVideo ? videoFile : undefined,
-          _imageFile: imageFile || undefined,
-        });
-        console.log(`[render] scene ${i + 1}: valid (video=${hasVideo}, image=${hasImage})`);
-      } else {
-        console.warn(`[render] scene ${i + 1}: missing media, skipping`);
-      }
-
-      if (scene.audioPath && fs.existsSync(scene.audioPath)) {
-        const stats = fs.statSync(scene.audioPath);
-        audioFiles.push(scene.audioPath);
-        console.log(`[render] audio scene ${i + 1}: path=${scene.audioPath} size=${stats.size}`);
-      }
-    }
-
-    console.log("[render] valid scenes:", validScenes.length, "of", project.plan.scenes.length);
-    console.log("[render] audio files found:", audioFiles.length);
-
-    if (!validScenes.length) {
+    // Prevent duplicate jobs
+    if (isRenderActive(projectId)) {
+      console.log("[render-video] job already running for", projectId);
       return NextResponse.json(
-        { error: "No scene media files found to render" },
-        { status: 400 }
+        { status: "rendering", message: "Render already in progress" },
+        { status: 202 }
       );
     }
 
-    console.log("[render] starting ffmpeg render");
-    const startTime = Date.now();
+    // Stale state: if persisted as rendering but no active job, allow re-trigger
+    if (project.status === "rendering") {
+      console.warn("[render-video] stale rendering state detected, re-triggering:", projectId);
+    }
 
-    const musicPath = selectMusicPath(project.plan.tone) || undefined;
-    console.log("[render] music:", musicPath || "none");
+    const projectDir = path.join(DATA_DIR, projectId);
+    fs.mkdirSync(projectDir, { recursive: true });
 
-    const result = await renderVideoWithFFmpeg({
-      projectDir,
-      scenes: validScenes,
-      musicPath,
+    updateServerProjectStatus(projectId, "rendering");
+
+    // Fire and forget - do NOT await
+    void runRenderJob(projectId).catch((err) => {
+      console.error("[render-video] background job unhandled error:", err);
     });
 
-    const elapsed = Date.now() - startTime;
-    console.log(`[render] ffmpeg completed in ${elapsed}ms`);
-
-    const outputStats = fs.statSync(result.outputPath);
-    console.log("[render] output verified:", {
-      path: result.outputPath,
-      size: outputStats.size,
-    });
-
-    project.videoPath = result.outputPath;
-    project.videoUrl = `/api/video/${projectId}`;
-    project.status = "completed";
-    saveServerProject(project);
-
-    const savedProject = getServerProject(projectId);
-    console.log("[render] verified saved project:", { videoPath: savedProject?.videoPath, status: savedProject?.status });
-
-    console.log("[render] returning response");
-    return NextResponse.json({
-      success: true,
-      outputPath: result.outputPath,
-      size: outputStats.size,
-      duration: result.duration,
-      videoUrl: `/api/video/${projectId}`,
-      project: savedProject,
-    });
+    console.log("[render-video] accepted, background job started for", projectId);
+    return NextResponse.json(
+      { status: "rendering", projectId, message: "Render started" },
+      { status: 202 }
+    );
   } catch (error) {
     console.error("[render-video] fatal error:", error);
     const message = error instanceof Error ? error.message : "Rendering failed";
-
     if (projectId) {
       updateServerProjectStatus(projectId, "error", message);
     }
-
     return NextResponse.json(
       { error: message },
       { status: 500 }
     );
   }
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const projectId = searchParams.get("id");
+  if (!projectId) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+  const project = getServerProject(projectId);
+  if (!project) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+  return NextResponse.json({
+    projectId,
+    status: project.status,
+    error: project.error,
+    videoUrl: project.videoUrl,
+    videoPath: project.videoPath,
+  });
 }

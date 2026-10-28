@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerProject } from "@/lib/projects/server-store";
+import { getServerProject, DATA_DIR } from "@/lib/projects/server-store";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -14,7 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         ? project.videoPath
         : path.join(process.cwd(), project.videoPath);
     } else {
-      videoPath = path.join(process.cwd(), "tmp", id, "final.mp4");
+      videoPath = path.join(DATA_DIR, id, "final.mp4");
     }
 
     if (!fs.existsSync(videoPath)) {

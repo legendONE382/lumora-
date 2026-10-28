@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { searchPexelsPhotos, searchPexelsVideos, selectBestPhoto, selectBestVideo, downloadPexelsFile, PexelsPhoto, PexelsVideo } from "@/lib/media/pexels";
-import { getServerProject, saveServerProject } from "@/lib/projects/server-store";
+import { getServerProject, saveServerProject, DATA_DIR } from "@/lib/projects/server-store";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const projectDir = path.join(process.cwd(), "tmp", projectId);
+    const projectDir = path.join(DATA_DIR, projectId);
     fs.mkdirSync(projectDir, { recursive: true });
 
     const scenes = await Promise.all(

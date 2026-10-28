@@ -143,8 +143,27 @@ function CreateContent() {
         throw new Error(errorData.error || "Failed to render video");
       }
 
-      const renderResult = await renderRes.json();
-      console.log("[create] render result:", renderResult);
+      // Poll render status until completed or failed
+      let renderDone = false;
+      let renderError: string | null = null;
+      while (!renderDone) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const statusRes = await fetch(`/api/render-status/${projectId}`);
+        if (!statusRes.ok) {
+          renderError = "Failed to check render status";
+          break;
+        }
+        const statusData = await statusRes.json();
+        if (statusData.status === "completed") {
+          renderDone = true;
+        } else if (statusData.status === "error") {
+          renderError = statusData.error || "Rendering failed";
+          break;
+        }
+        // keep spinner; optionally update progress
+      }
+
+      if (renderError) throw new Error(renderError);
 
       updateProjectStatus(projectId, "completed");
       updateStep("done", "Video ready!", 100);

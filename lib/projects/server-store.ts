@@ -17,7 +17,14 @@ function loadServerStore(): void {
     if (fs.existsSync(serverStoreFile)) {
       const raw = fs.readFileSync(serverStoreFile, "utf-8");
       const projects = JSON.parse(raw) as Project[];
-      projects.forEach((p) => serverStore.set(p.id, p));
+      projects.forEach((p) => {
+        if (p.status === "rendering") {
+          console.warn("[server-store] resetting stale rendering state for project", p.id);
+          p.status = "error";
+          p.error = "Rendering was interrupted (server restarted). Please retry.";
+        }
+        serverStore.set(p.id, p);
+      });
       console.log("[server-store] loaded", serverStore.size, "projects from", serverStoreFile);
     }
   } catch (error) {

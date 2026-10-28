@@ -20,36 +20,32 @@ function ProjectDetailContent() {
     const id = typeof params.id === "string" ? params.id : Array.isArray(params.id) ? params.id[0] : undefined;
     if (!id) return;
 
-    let p = getProject(id);
+    let cancelled = false;
 
-    if (!p) {
-      fetch(`/api/projects/${id}`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Project not found");
-          return res.json();
-        })
-        .then((project) => {
-          saveProject(project);
-          setProject(project);
-          if (project?.videoUrl) {
-            getProjectVideoUrl(id).then((url) => {
-              setVideoUrl(url);
-            });
-          }
-        })
-        .catch(() => {
-          setProject(null);
-        });
-    } else {
-      setProject(p);
-      if (p?.videoUrl) {
-        getProjectVideoUrl(id).then((url) => {
-          setVideoUrl(url);
-        });
-      } else {
-        setVideoUrl(`/api/video/${id}`);
+    (async () => {
+      try {
+        const res = await fetch(`/api/projects/${id}`);
+        if (!res.ok) throw new Error("Project not found");
+        const project = await res.json();
+        saveProject(project);
+        if (cancelled) return;
+        setProject(project);
+        if (project?.videoPath || project?.videoUrl) {
+          setVideoUrl(`/api/video/${id}`);
+        }
+      } catch {
+        // Fallback to localStorage if server unavailable
+        const p = getProject(id);
+        if (!cancelled) {
+          setProject(p || null);
+          if (p?.videoPath || p?.videoUrl) setVideoUrl(`/api/video/${id}`);
+        }
       }
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [params.id]);
 
   if (!mounted) return null;
